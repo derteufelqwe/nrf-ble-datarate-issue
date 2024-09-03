@@ -13,6 +13,6 @@ FILE(GLOB app_sources src/*.c)
 target_sources(app PRIVATE ${app_sources})
 
 target_link_libraries(app PRIVATE
-        DRAEGER_NETBUF_UTILS
 )
+#        DRAEGER_NETBUF_UTILS
 #        DRAEGER_TEST_PB

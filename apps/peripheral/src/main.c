@@ -1,15 +1,9 @@
-/*
- * Copyright (c) 2021 Nordic Semiconductor ASA
- * SPDX-License-Identifier: Apache-2.0
- */
-
 #include <stdlib.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/shell/shell.h>
 #include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
@@ -22,6 +16,8 @@ LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
     BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x04BC0100, 0x0E7F, 0x46FE, 0x89AA, 0xA698E16CA002))
 #define UART_TX_UUID                                                                               \
     BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x04BC0200, 0x0E7F, 0x46FE, 0x89AA, 0xA698E16CA002))
+
+#define MEASURE_DURATION_MS 30000
 
 K_THREAD_STACK_DEFINE(my_stack_area, 5000);
 struct k_work_q bench_work_queue;
@@ -75,8 +71,8 @@ static ssize_t gatt_write_rx(struct bt_conn *conn, const struct bt_gatt_attr *at
             if (c_start == 0) {
                 break;
             }
-            uint32_t k_bytes = payload_sum / (10 * 1000);
-            uint32_t k_bits =  (payload_sum * 8) / (10 * 1000);
+            uint32_t k_bytes = payload_sum / MEASURE_DURATION_MS;
+            uint32_t k_bits =  (payload_sum * 8) / MEASURE_DURATION_MS;
             LOG_INF("Bench result: %d bytes. %d KB/s = %d kbps", payload_sum, k_bytes, k_bits);
             c_start = 0;
             break;
@@ -150,7 +146,7 @@ static void bench_work_handler(struct k_work *work) {
     // Main benchmark
     uint32_t c_start = k_cycle_get_32();
     payload[0] = 0x10;
-    while (k_cyc_to_ms_ceil32(k_cycle_get_32() - c_start) < 10000) {
+    while (k_cyc_to_ms_ceil32(k_cycle_get_32() - c_start) < MEASURE_DURATION_MS) {
         send_notify(payload, payload_size);
     }
 

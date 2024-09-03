@@ -1,8 +1,3 @@
-/*
- * Copyright (c) 2021 Nordic Semiconductor ASA
- * SPDX-License-Identifier: Apache-2.0
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <zephyr/logging/log.h>
@@ -25,6 +20,8 @@ LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
     BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x04BC0200, 0x0E7F, 0x46FE, 0x89AA, 0xA698E16CA002))
 #define UART_RX_UUID                                                                               \
     BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x04BC0100, 0x0E7F, 0x46FE, 0x89AA, 0xA698E16CA002))
+
+#define MEASURE_DURATION_MS 30000
 
 K_THREAD_STACK_DEFINE(my_stack_area, 5000);
 struct k_work_q bench_work_queue;
@@ -63,8 +60,8 @@ static uint8_t notify_func(struct bt_conn *conn, struct bt_gatt_subscribe_params
             if (c_start == 0) {
                 break;
             }
-            uint32_t k_bytes = payload_sum / (10 * 1000);
-            uint32_t k_bits =  (payload_sum * 8) / (10 * 1000);
+            uint32_t k_bytes = payload_sum / MEASURE_DURATION_MS;
+            uint32_t k_bits =  (payload_sum * 8) / MEASURE_DURATION_MS;
             LOG_INF("Bench result: %d bytes. %d KB/s = %d kbps", payload_sum, k_bytes, k_bits);
             c_start = 0;
             break;
@@ -321,10 +318,17 @@ static void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_
     }
 }
 
+static void conn_param_updated(struct bt_conn *conn, uint16_t interval, uint16_t latency, uint16_t timeout) {
+    LOG_DBG("Connection interval updated: %d units (%d ms)", interval, (int) (interval * 1.25));
+    LOG_DBG("Connection latency: %d", latency);
+    LOG_DBG("Connection supervision timeout: %d units", timeout);
+}
+
 BT_CONN_CB_DEFINE(conn_callbacks) = {
         .connected = connected,
         .disconnected = disconnected,
         .security_changed = security_changed,
+        .le_param_updated = conn_param_updated,
 };
 
 // --- Pairing ---
@@ -401,7 +405,7 @@ static void bench_work_handler(struct k_work *work) {
     // Main benchmark
     uint32_t c_start = k_cycle_get_32();
     payload[0] = 0x10;
-    while (k_cyc_to_ms_ceil32(k_cycle_get_32() - c_start) < 10000) {
+    while (k_cyc_to_ms_ceil32(k_cycle_get_32() - c_start) < MEASURE_DURATION_MS) {
         bt_gatt_write_without_response(default_conn, write_handle, payload, payload_size, false);
     }
 
