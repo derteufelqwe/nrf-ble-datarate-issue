@@ -392,10 +392,12 @@ static struct bt_conn_auth_info_cb conn_auth_info_callbacks = {
 // --- Bench work ---
 
 static void bench_work_handler(struct k_work *work) {
+    int err;
+
     char payload[payload_size];
     memset(payload, 0x10, payload_size);
 
-    LOG_INF("Starting benchmark...");
+    LOG_INF("Starting benchmark with payload size %d...", payload_size);
     // Send start command
     payload[0] = 0x11;
     for (int i = 0; i < 10; ++i) {
@@ -406,8 +408,12 @@ static void bench_work_handler(struct k_work *work) {
     uint32_t c_start = k_cycle_get_32();
     payload[0] = 0x10;
     while (k_cyc_to_ms_ceil32(k_cycle_get_32() - c_start) < MEASURE_DURATION_MS) {
-        bt_gatt_write_without_response(default_conn, write_handle, payload, payload_size, false);
+        err = bt_gatt_write_without_response(default_conn, write_handle, payload, payload_size, false);
+        if (err) {
+            LOG_ERR("gatt_write failed with code %d", err);
+        }
     }
+    uint32_t c_stop = k_cycle_get_32();
 
     // Send stop command
     payload[0] = 0x12;
@@ -415,7 +421,7 @@ static void bench_work_handler(struct k_work *work) {
         bt_gatt_write_without_response(default_conn, write_handle, payload, payload_size, false);
     }
 
-    LOG_INF("Finished benchmark.");
+    LOG_INF("Finished benchmark after %d ms.", k_cyc_to_ms_ceil32(c_stop - c_start));
 }
 
 K_WORK_DEFINE(bench_work, bench_work_handler);
