@@ -7,6 +7,8 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
+#include <sdc_hci_vs.h>
+#include <host/conn_internal.h>
 
 LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
 
@@ -72,7 +74,7 @@ static ssize_t gatt_write_rx(struct bt_conn *conn, const struct bt_gatt_attr *at
                 break;
             }
             uint32_t k_bytes = payload_sum / MEASURE_DURATION_MS;
-            uint32_t k_bits =  (payload_sum * 8) / MEASURE_DURATION_MS;
+            uint32_t k_bits = (payload_sum * 8) / MEASURE_DURATION_MS;
             LOG_INF("Bench result: %d bytes. %d KB/s = %d kbps", payload_sum, k_bytes, k_bits);
             c_start = 0;
             break;
@@ -108,6 +110,27 @@ static void connected(struct bt_conn *conn, uint8_t err) {
 
     LOG_INF("Connected");
     default_conn = conn;
+
+// --- Fix option A (update connection parameters)
+    struct bt_le_conn_param *conn_params = BT_LE_CONN_PARAM(99 / 1.25, 101 / 1.25, 0, 400);
+    err = bt_conn_le_param_update(conn, conn_params);
+    if (err) {
+        LOG_ERR("Updating peripheral connection parameters returned error %d", err);
+    }
+// ------
+
+
+// --- Fix option B (ignore slave latency on peripheral)
+//    sdc_hci_cmd_vs_peripheral_latency_mode_set_t params = {
+//            .conn_handle = conn->handle,
+//            .mode = SDC_HCI_VS_PERIPHERAL_LATENCY_MODE_DISABLE,
+//    };
+//
+//    err = sdc_hci_cmd_vs_peripheral_latency_mode_set(&params);
+//    if (err) {
+//        LOG_ERR("Updating peripheral latency returned error %d", err);
+//    }
+// ------
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason) {
